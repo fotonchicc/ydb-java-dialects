@@ -53,10 +53,14 @@
         <exposed.version>1.3.0</exposed.version>
 
         <junit5.version>5.10.2</junit5.version>
+        <surefire.version>3.5.2</surefire.version>
+
         <log4j2.version>2.17.2</log4j2.version>
 
         <ydb.sdk.version>2.4.3</ydb.sdk.version>
         <ydb.jdbc.version>2.3.22</ydb.jdbc.version>
+
+        <empty.javadoc.dir>${project.build.directory}/empty-javadoc</empty.javadoc.dir>
     </properties>
 
     <dependencyManagement>
@@ -72,17 +76,11 @@
     </dependencyManagement>
 
     <dependencies>
+        <!-- Main -->
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib</artifactId>
             <version>${kotlin.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.jetbrains.kotlin</groupId>
-            <artifactId>kotlin-reflect</artifactId>
-            <version>${kotlin.version}</version>
-            <scope>test</scope>
         </dependency>
 
         <dependency>
@@ -97,16 +95,37 @@
 
         <!-- Test -->
         <dependency>
-            <groupId>tech.ydb.jdbc</groupId>
-            <artifactId>ydb-jdbc-driver</artifactId>
-            <version>${ydb.jdbc.version}</version>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-reflect</artifactId>
+            <version>${kotlin.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <artifactId>junit-jupiter-api</artifactId>
             <version>${junit5.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>${junit5.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+            <version>${junit5.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>tech.ydb.jdbc</groupId>
+            <artifactId>ydb-jdbc-driver</artifactId>
+            <version>${ydb.jdbc.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -129,6 +148,18 @@
         </dependency>
 
         <dependency>
+            <groupId>org.jetbrains.exposed</groupId>
+            <artifactId>exposed-migration-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jetbrains.exposed</groupId>
+            <artifactId>exposed-migration-jdbc</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
             <groupId>tech.ydb.test</groupId>
             <artifactId>ydb-junit5-support</artifactId>
             <version>${ydb.sdk.version}</version>
@@ -144,6 +175,9 @@
     </dependencies>
 
     <build>
+        <sourceDirectory>${project.basedir}/src/main/kotlin</sourceDirectory>
+        <testSourceDirectory>${project.basedir}/src/test/kotlin</testSourceDirectory>
+
         <plugins>
             <!-- Kotlin -->
             <plugin>
@@ -157,96 +191,97 @@
                         <goals>
                             <goal>compile</goal>
                         </goals>
-                        <configuration>
-                            <jvmTarget>17</jvmTarget>
-                            <sourceDirs>
-                                <sourceDir>src/main/kotlin</sourceDir>
-                            </sourceDirs>
-                        </configuration>
                     </execution>
+
                     <execution>
                         <id>test-compile</id>
                         <phase>test-compile</phase>
                         <goals>
                             <goal>test-compile</goal>
                         </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <jvmTarget>17</jvmTarget>
+                </configuration>
+            </plugin>
+
+            <!-- Tests: mvn clean test -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${surefire.version}</version>
+                <configuration>
+                    <useModulePath>false</useModulePath>
+                    <includes>
+                        <include>**/*Test.class</include>
+                        <include>**/*Tests.class</include>
+                        <include>**/*IT.class</include>
+                    </includes>
+                    <environmentVariables>
+                        <TESTCONTAINERS_REUSE_ENABLE>true</TESTCONTAINERS_REUSE_ENABLE>
+                        <YDB_DOCKER_IMAGE>ydbplatform/local-ydb:trunk</YDB_DOCKER_IMAGE>
+                    </environmentVariables>
+                </configuration>
+            </plugin>
+
+            <!-- Prepare minimal javadoc directory for Maven Central -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>prepare-empty-javadoc</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
                         <configuration>
-                            <jvmTarget>17</jvmTarget>
-                            <sourceDirs>
-                                <sourceDir>src/test/kotlin</sourceDir>
-                            </sourceDirs>
+                            <target>
+                                <mkdir dir="${empty.javadoc.dir}"/>
+                                <echo file="${empty.javadoc.dir}/README.txt">
+                                    Kotlin project. API documentation is provided by source artifacts.
+                                </echo>
+                            </target>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
 
+            <!-- Main jar + sources.jar + javadoc.jar -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.5.0</version>
-                <configuration>
-                    <source>17</source>
-                </configuration>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
                 <executions>
                     <execution>
-                        <id>attach-javadocs</id>
+                        <id>attach-kotlin-sources</id>
+                        <phase>package</phase>
                         <goals>
                             <goal>jar</goal>
                         </goals>
+                        <configuration>
+                            <classifier>sources</classifier>
+                            <classesDirectory>${project.basedir}/src/main/kotlin</classesDirectory>
+                            <includes>
+                                <include>**/*.kt</include>
+                            </includes>
+                        </configuration>
                     </execution>
-                </executions>
-            </plugin>
 
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-source-plugin</artifactId>
-                <version>3.2.1</version>
-                <executions>
                     <execution>
-                        <id>attach-sources</id>
+                        <id>attach-javadocs</id>
+                        <phase>package</phase>
                         <goals>
-                            <goal>jar-no-fork</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Unit tests (no YDB needed) -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.1.0</version>
-                <configuration>
-                    <useModulePath>false</useModulePath>
-                    <includes>
-                        <include>**/*Test.*</include>
-                    </includes>
-                    <excludes>
-                        <exclude>**/*IT.*</exclude>
-                    </excludes>
-                </configuration>
-            </plugin>
-
-            <!-- Integration tests (YDB via testcontainers) -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-failsafe-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                    <execution>
-                        <id>integration-tests</id>
-                        <goals>
-                            <goal>integration-test</goal>
-                            <goal>verify</goal>
+                            <goal>jar</goal>
                         </goals>
                         <configuration>
+                            <classifier>javadoc</classifier>
+                            <classesDirectory>${empty.javadoc.dir}</classesDirectory>
                             <includes>
-                                <include>**/*IT.*</include>
+                                <include>**/*</include>
                             </includes>
-                            <environmentVariables>
-                                <TESTCONTAINERS_REUSE_ENABLE>true</TESTCONTAINERS_REUSE_ENABLE>
-                                <YDB_DOCKER_IMAGE>ydbplatform/local-ydb:trunk</YDB_DOCKER_IMAGE>
-                            </environmentVariables>
                         </configuration>
                     </execution>
                 </executions>
@@ -283,6 +318,7 @@
                             </gpgArguments>
                         </configuration>
                     </plugin>
+
                     <plugin>
                         <groupId>org.sonatype.central</groupId>
                         <artifactId>central-publishing-maven-plugin</artifactId>

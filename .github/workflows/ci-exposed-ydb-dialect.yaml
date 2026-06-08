@@ -25,10 +25,10 @@ jobs:
         java: [ '17', '21' ]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ matrix.java }}
           distribution: 'temurin'
@@ -38,6 +38,13 @@ jobs:
         working-directory: ./kotlin-exposed-dialect
         run: mvn $MAVEN_ARGS dependency:go-offline
 
-      - name: Build & verify (unit + integration tests with testcontainers)
+      - name: Build & verify
         working-directory: ./kotlin-exposed-dialect
         run: mvn $MAVEN_ARGS verify
+
+      - name: Compile demo
+        working-directory: ./kotlin-exposed-dialect
+        run: |
+          mvn $MAVEN_ARGS install -DskipTests
+          cd example
+          mvn $MAVEN_ARGS compile
